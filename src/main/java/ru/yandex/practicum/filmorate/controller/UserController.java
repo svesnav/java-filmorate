@@ -21,15 +21,13 @@ public class UserController {
 
     @GetMapping
     public List<User> findAll() {
+        log.info("Showed all users");
         return new ArrayList<>(users.values());
     }
 
     @PostMapping
     public User create(@RequestBody User user) {
-        validate(user);
-        if (user.getName() == null || user.getName().isBlank()) {
-            user.setName(user.getLogin());
-        }
+        validateAndPrepare(user);
         user.setId(idCounter++);
         users.put(user.getId(), user);
         log.info("User created: {}", user);
@@ -42,13 +40,17 @@ public class UserController {
             log.warn("User not found: {}", user.getId());
             throw new NotFoundException("User with id " + user.getId() + " not found");
         }
+        validateAndPrepare(user);
+        users.put(user.getId(), user);
+        log.info("User updated: {}", user);
+        return user;
+    }
+
+    private void validateAndPrepare(User user) {
         validate(user);
         if (user.getName() == null || user.getName().isBlank()) {
             user.setName(user.getLogin());
         }
-        users.put(user.getId(), user);
-        log.info("User updated: {}", user);
-        return user;
     }
 
     private void validate(User user) {
@@ -60,7 +62,11 @@ public class UserController {
             log.warn("User login validation failed");
             throw new ValidationException("Login must not be empty and must not contain spaces");
         }
-        if (user.getBirthday() != null && user.getBirthday().isAfter(LocalDate.now())) {
+        if (user.getBirthday() == null) {
+            log.warn("User birthday validation failed");
+            throw new ValidationException("Birthday must not be empty");
+        }
+        if (user.getBirthday().isAfter(LocalDate.now())) {
             log.warn("User birthday validation failed");
             throw new ValidationException("Birthday cannot be in the future");
         }

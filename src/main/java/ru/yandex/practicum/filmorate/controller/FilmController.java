@@ -21,6 +21,7 @@ public class FilmController {
 
     @GetMapping
     public List<Film> findAll() {
+        log.info("Showed all films");
         return new ArrayList<>(films.values());
     }
 
