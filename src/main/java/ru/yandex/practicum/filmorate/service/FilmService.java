@@ -7,7 +7,6 @@ import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
-import ru.yandex.practicum.filmorate.storage.film.InMemoryFilmStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.time.LocalDate;
@@ -78,7 +77,7 @@ public class FilmService {
 
     public List<Film> getPopular(Integer count) {
         log.info("Showed {} popular films", count);
-        return InMemoryFilmStorage.getPopular(count, filmStorage);
+        return filmStorage.getPopular(count);
     }
 
     private Film getFilmOrThrow(long id) {

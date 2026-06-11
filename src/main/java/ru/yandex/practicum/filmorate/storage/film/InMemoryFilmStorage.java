@@ -46,10 +46,11 @@ public class InMemoryFilmStorage implements FilmStorage {
         return films.values();
     }
 
-    public static List<Film> getPopular(Integer count, FilmStorage filmStorage) {
+    @Override
+    public List<Film> getPopular(Integer count) {
         int limit = count == null ? DEFAULT_POPULAR_COUNT : count;
         log.debug("Showed {} popular films", limit);
-        return filmStorage.findAll().stream()
+        return findAll().stream()
                 .sorted(Comparator.comparingInt((Film film) -> film.getLikes().size()).reversed()
                         .thenComparingLong(Film::getId))
                 .limit(limit)
