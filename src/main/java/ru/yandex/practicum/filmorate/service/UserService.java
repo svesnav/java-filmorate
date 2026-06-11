@@ -31,7 +31,7 @@ public class UserService {
         return userStorage.findAll().stream().toList();
     }
 
-    public User findById(int id) {
+    public User findById(long id) {
         log.info("Showed user with id {}", id);
         return getUserOrThrow(id);
     }
@@ -52,54 +52,60 @@ public class UserService {
         return updated;
     }
 
-    public void delete(int id) {
+    public void delete(long id) {
         getUserOrThrow(id);
         userStorage.delete(id);
         log.info("User deleted: id={}", id);
     }
 
-    public void addFriend(int userId, int friendId) {
-        if (userId == friendId) {
-            log.warn("User cannot add themselves as a friend: userId={}", userId);
-            throw new ValidationException("User cannot add themselves as a friend");
-        }
+    public void addFriend(long userId, long friendId) {
+        validateDifferentUsers(userId, friendId);
         User user = getUserOrThrow(userId);
         User friend = getUserOrThrow(friendId);
-        user.getFriends().add((long) friendId);
-        friend.getFriends().add((long) userId);
+        user.getFriends().add(friendId);
+        friend.getFriends().add(userId);
         log.info("Users {} and {} are now friends", userId, friendId);
     }
 
-    public void removeFriend(int userId, int friendId) {
+    public void removeFriend(long userId, long friendId) {
+        validateDifferentUsers(userId, friendId);
         User user = getUserOrThrow(userId);
         User friend = getUserOrThrow(friendId);
-        user.getFriends().remove((long) friendId);
-        friend.getFriends().remove((long) userId);
+        user.getFriends().remove(friendId);
+        friend.getFriends().remove(userId);
         log.info("Users {} and {} are no longer friends", userId, friendId);
     }
 
-    public List<User> getFriends(int userId) {
+    public List<User> getFriends(long userId) {
         log.info("Showed friends of user {}", userId);
         User user = getUserOrThrow(userId);
         return user.getFriends().stream()
                 .map(friendId -> getUserOrThrow(friendId.intValue()))
-                .sorted(Comparator.comparingInt(User::getId))
+                .sorted(Comparator.comparingLong(User::getId))
                 .collect(Collectors.toCollection(ArrayList::new));
     }
 
-    public List<User> getCommonFriends(int userId, int otherId) {
+    public List<User> getCommonFriends(long userId, long otherId) {
+        validateDifferentUsers(userId, otherId);
         log.info("Showed common friends of users {} and {}", userId, otherId);
         User user = getUserOrThrow(userId);
         User other = getUserOrThrow(otherId);
         Set<Long> commonFriendIds = new HashSet<>(user.getFriends());
         commonFriendIds.retainAll(other.getFriends());
         return commonFriendIds.stream()
-                .map(friendId -> getUserOrThrow(friendId.intValue()))
-                .sorted(Comparator.comparingInt(User::getId))
+                .map(this::getUserOrThrow)
+                .sorted(Comparator.comparingLong(User::getId))
                 .collect(Collectors.toCollection(ArrayList::new));
     }
 
-    private User getUserOrThrow(int id) {
+    private void validateDifferentUsers(long userId, long otherUserId) {
+        if (userId == otherUserId) {
+            log.warn("Users must be different: userId={}", userId);
+            throw new ValidationException("Users must be different");
+        }
+    }
+
+    private User getUserOrThrow(long id) {
         return userStorage.findById(id)
                 .orElseThrow(() -> {
                     log.warn("User not found: {}", id);

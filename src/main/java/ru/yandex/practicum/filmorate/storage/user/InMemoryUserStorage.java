@@ -12,7 +12,7 @@ import java.util.Optional;
 @Slf4j
 @Component
 public class InMemoryUserStorage implements UserStorage {
-    private final Map<Integer, User> users = new HashMap<>();
+    private final Map<Long, User> users = new HashMap<>();
     private int idCounter = 1;
 
     @Override
@@ -31,13 +31,13 @@ public class InMemoryUserStorage implements UserStorage {
     }
 
     @Override
-    public void delete(int id) {
+    public void delete(long id) {
         users.remove(id);
         log.debug("User deleted from storage: id={}", id);
     }
 
     @Override
-    public Optional<User> findById(int id) {
+    public Optional<User> findById(long id) {
         return Optional.ofNullable(users.get(id));
     }
 

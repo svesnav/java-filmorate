@@ -8,7 +8,7 @@ import java.util.Set;
 
 @Data
 public class Film {
-    private int id;
+    private long id;
     private String name;
     private String description;
     private LocalDate releaseDate;

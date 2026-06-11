@@ -10,9 +10,9 @@ public interface UserStorage {
 
     User update(User user);
 
-    void delete(int id);
+    void delete(long id);
 
-    Optional<User> findById(int id);
+    Optional<User> findById(long id);
 
     Collection<User> findAll();
 }

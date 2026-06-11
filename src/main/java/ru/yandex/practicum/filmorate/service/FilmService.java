@@ -7,6 +7,7 @@ import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
+import ru.yandex.practicum.filmorate.storage.film.InMemoryFilmStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.time.LocalDate;
@@ -33,7 +34,7 @@ public class FilmService {
         return filmStorage.findAll().stream().toList();
     }
 
-    public Film findById(int id) {
+    public Film findById(long id) {
         log.info("Showed film with id {}", id);
         return getFilmOrThrow(id);
     }
@@ -57,37 +58,32 @@ public class FilmService {
         return updated;
     }
 
-    public void delete(int id) {
+    public void delete(long id) {
         getFilmOrThrow(id);
         filmStorage.delete(id);
         log.info("Film deleted: id={}", id);
     }
 
-    public void addLike(int filmId, int userId) {
+    public void addLike(long filmId, long userId) {
         getUserOrThrow(userId);
         Film film = getFilmOrThrow(filmId);
-        film.getLikes().add((long) userId);
+        film.getLikes().add(userId);
         log.info("User {} liked film {}", userId, filmId);
     }
 
-    public void removeLike(int filmId, int userId) {
+    public void removeLike(long filmId, long userId) {
         getUserOrThrow(userId);
         Film film = getFilmOrThrow(filmId);
-        film.getLikes().remove((long) userId);
+        film.getLikes().remove(userId);
         log.info("User {} removed like from film {}", userId, filmId);
     }
 
     public List<Film> getPopular(Integer count) {
-        int limit = count == null ? DEFAULT_POPULAR_COUNT : count;
-        log.info("Showed {} popular films", limit);
-        return filmStorage.findAll().stream()
-                .sorted(Comparator.comparingInt((Film film) -> film.getLikes().size()).reversed()
-                        .thenComparingInt(Film::getId))
-                .limit(limit)
-                .toList();
+        log.info("Showed {} popular films", count);
+        return InMemoryFilmStorage.getPopular(count, filmStorage);
     }
 
-    private Film getFilmOrThrow(int id) {
+    private Film getFilmOrThrow(long id) {
         return filmStorage.findById(id)
                 .orElseThrow(() -> {
                     log.warn("Film not found: {}", id);
@@ -95,7 +91,7 @@ public class FilmService {
                 });
     }
 
-    private void getUserOrThrow(int id) {
+    private void getUserOrThrow(long id) {
         userStorage.findById(id)
                 .orElseThrow(() -> {
                     log.warn("User not found: {}", id);
