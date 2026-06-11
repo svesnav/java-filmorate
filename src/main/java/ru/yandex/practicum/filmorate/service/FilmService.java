@@ -11,14 +11,12 @@ import ru.yandex.practicum.filmorate.storage.film.InMemoryFilmStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 
 @Slf4j
 @Service
 public class FilmService {
-    private static final int DEFAULT_POPULAR_COUNT = 10;
 
     private final FilmStorage filmStorage;
     private final UserStorage userStorage;
