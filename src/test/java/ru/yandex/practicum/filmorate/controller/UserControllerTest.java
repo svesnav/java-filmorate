@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import ru.yandex.practicum.filmorate.model.User;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -25,9 +26,10 @@ class UserControllerTest {
     private ObjectMapper objectMapper;
 
     private User validUser() {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
         User user = new User();
-        user.setEmail("mail@mail.ru");
-        user.setLogin("dolore");
+        user.setEmail("user_" + suffix + "@mail.ru");
+        user.setLogin("login_" + suffix);
         user.setName("Nick Name");
         user.setBirthday(LocalDate.of(1990, 1, 1));
         return user;
@@ -41,7 +43,7 @@ class UserControllerTest {
                         .content(objectMapper.writeValueAsString(user)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").isNumber())
-                .andExpect(jsonPath("$.email").value("mail@mail.ru"));
+                .andExpect(jsonPath("$.email").value(user.getEmail()));
     }
 
     @Test
@@ -92,7 +94,7 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(user)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("dolore"));
+                .andExpect(jsonPath("$.name").value(user.getLogin()));
     }
 
     @Test

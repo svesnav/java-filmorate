@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Mpa;
 
 import java.time.LocalDate;
 
@@ -30,6 +31,9 @@ class FilmControllerTest {
         film.setDescription("Test description");
         film.setReleaseDate(LocalDate.of(2000, 1, 1));
         film.setDuration(120);
+        Mpa mpa = new Mpa();
+        mpa.setId(1);
+        film.setMpa(mpa);
         return film;
     }
 

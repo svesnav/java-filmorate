@@ -2,6 +2,7 @@ package ru.yandex.practicum.filmorate.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
@@ -22,7 +23,7 @@ public class UserService {
     private final UserStorage userStorage;
 
     @Autowired
-    public UserService(UserStorage userStorage) {
+    public UserService(@Qualifier("userDbStorage") UserStorage userStorage) {
         this.userStorage = userStorage;
     }
 
@@ -60,20 +61,18 @@ public class UserService {
 
     public void addFriend(long userId, long friendId) {
         validateDifferentUsers(userId, friendId);
-        User user = getUserOrThrow(userId);
-        User friend = getUserOrThrow(friendId);
-        user.getFriends().add(friendId);
-        friend.getFriends().add(userId);
-        log.info("Users {} and {} are now friends", userId, friendId);
+        getUserOrThrow(userId);
+        getUserOrThrow(friendId);
+        userStorage.addFriend(userId, friendId);
+        log.info("User {} added user {} as friend", userId, friendId);
     }
 
     public void removeFriend(long userId, long friendId) {
         validateDifferentUsers(userId, friendId);
-        User user = getUserOrThrow(userId);
-        User friend = getUserOrThrow(friendId);
-        user.getFriends().remove(friendId);
-        friend.getFriends().remove(userId);
-        log.info("Users {} and {} are no longer friends", userId, friendId);
+        getUserOrThrow(userId);
+        getUserOrThrow(friendId);
+        userStorage.removeFriend(userId, friendId);
+        log.info("User {} removed user {} from friends", userId, friendId);
     }
 
     public List<User> getFriends(long userId) {
