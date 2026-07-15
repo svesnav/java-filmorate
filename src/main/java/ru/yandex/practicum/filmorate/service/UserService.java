@@ -10,12 +10,8 @@ import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -76,25 +72,17 @@ public class UserService {
     }
 
     public List<User> getFriends(long userId) {
+        getUserOrThrow(userId);
         log.info("Showed friends of user {}", userId);
-        User user = getUserOrThrow(userId);
-        return user.getFriends().stream()
-                .map(friendId -> getUserOrThrow(friendId.intValue()))
-                .sorted(Comparator.comparingLong(User::getId))
-                .collect(Collectors.toCollection(ArrayList::new));
+        return userStorage.getFriends(userId);
     }
 
     public List<User> getCommonFriends(long userId, long otherId) {
         validateDifferentUsers(userId, otherId);
+        getUserOrThrow(userId);
+        getUserOrThrow(otherId);
         log.info("Showed common friends of users {} and {}", userId, otherId);
-        User user = getUserOrThrow(userId);
-        User other = getUserOrThrow(otherId);
-        Set<Long> commonFriendIds = new HashSet<>(user.getFriends());
-        commonFriendIds.retainAll(other.getFriends());
-        return commonFriendIds.stream()
-                .map(this::getUserOrThrow)
-                .sorted(Comparator.comparingLong(User::getId))
-                .collect(Collectors.toCollection(ArrayList::new));
+        return userStorage.getCommonFriends(userId, otherId);
     }
 
     private void validateDifferentUsers(long userId, long otherUserId) {

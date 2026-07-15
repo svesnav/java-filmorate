@@ -3,6 +3,7 @@ package ru.yandex.practicum.filmorate.storage.film;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -14,11 +15,16 @@ import ru.yandex.practicum.filmorate.model.Mpa;
 
 import java.sql.Date;
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -98,9 +104,8 @@ public class FilmDbStorage implements FilmStorage {
         if (films.isEmpty()) {
             return Optional.empty();
         }
-        Film film = films.getFirst();
-        enrichFilm(film);
-        return Optional.of(film);
+        enrichFilms(films);
+        return Optional.of(films.getFirst());
     }
 
     @Override
@@ -110,7 +115,7 @@ public class FilmDbStorage implements FilmStorage {
                         + "f.mpa_id, m.name AS mpa_name "
                         + "FROM films f JOIN mpa m ON f.mpa_id = m.mpa_id ORDER BY f.film_id",
                 filmRowMapper);
-        films.forEach(this::enrichFilm);
+        enrichFilms(films);
         return films;
     }
 
@@ -127,7 +132,7 @@ public class FilmDbStorage implements FilmStorage {
                         + "ORDER BY COUNT(fl.user_id) DESC, f.film_id ASC "
                         + "LIMIT ?",
                 filmRowMapper, limit);
-        films.forEach(this::enrichFilm);
+        enrichFilms(films);
         return films;
     }
 
@@ -144,40 +149,65 @@ public class FilmDbStorage implements FilmStorage {
     }
 
     private void saveGenres(Film film) {
-        if (film.getGenres() == null) {
+        if (film.getGenres() == null || film.getGenres().isEmpty()) {
             return;
         }
-        for (Genre genre : film.getGenres()) {
-            jdbcTemplate.update("INSERT INTO film_genres (film_id, genre_id) VALUES (?, ?)",
-                    film.getId(), genre.getId());
+        List<Genre> genres = new ArrayList<>(film.getGenres());
+        jdbcTemplate.batchUpdate(
+                "INSERT INTO film_genres (film_id, genre_id) VALUES (?, ?)",
+                new BatchPreparedStatementSetter() {
+                    @Override
+                    public void setValues(PreparedStatement ps, int i) throws SQLException {
+                        ps.setLong(1, film.getId());
+                        ps.setInt(2, genres.get(i).getId());
+                    }
+
+                    @Override
+                    public int getBatchSize() {
+                        return genres.size();
+                    }
+                });
+    }
+
+    private void enrichFilms(List<Film> films) {
+        if (films.isEmpty()) {
+            return;
         }
+        List<Long> filmIds = films.stream().map(Film::getId).toList();
+        Map<Long, Set<Genre>> genresByFilmId = getGenresByFilmIds(filmIds);
+        Map<Long, Set<Long>> likesByFilmId = getLikesByFilmIds(filmIds);
+        films.forEach(film -> {
+            film.setGenres(genresByFilmId.getOrDefault(film.getId(), new LinkedHashSet<>()));
+            film.setLikes(likesByFilmId.getOrDefault(film.getId(), new HashSet<>()));
+        });
     }
 
-    private void enrichFilm(Film film) {
-        film.setGenres(getGenres(film.getId()));
-        film.setLikes(getLikes(film.getId()));
+    private Map<Long, Set<Genre>> getGenresByFilmIds(List<Long> filmIds) {
+        String inSql = String.join(",", Collections.nCopies(filmIds.size(), "?"));
+        String sql = "SELECT fg.film_id, g.genre_id, g.name "
+                + "FROM film_genres fg "
+                + "JOIN genres g ON fg.genre_id = g.genre_id "
+                + "WHERE fg.film_id IN (" + inSql + ") "
+                + "ORDER BY fg.film_id, g.genre_id";
+        Map<Long, Set<Genre>> genresByFilmId = new HashMap<>();
+        jdbcTemplate.query(sql, rs -> {
+            long filmId = rs.getLong("film_id");
+            Genre genre = new Genre();
+            genre.setId(rs.getInt("genre_id"));
+            genre.setName(rs.getString("name"));
+            genresByFilmId.computeIfAbsent(filmId, id -> new LinkedHashSet<>()).add(genre);
+        }, filmIds.toArray());
+        return genresByFilmId;
     }
 
-    private Set<Genre> getGenres(long filmId) {
-        List<Genre> genres = jdbcTemplate.query(
-                "SELECT g.genre_id, g.name FROM genres g "
-                        + "JOIN film_genres fg ON g.genre_id = fg.genre_id "
-                        + "WHERE fg.film_id = ? ORDER BY g.genre_id",
-                (rs, rowNum) -> {
-                    Genre genre = new Genre();
-                    genre.setId(rs.getInt("genre_id"));
-                    genre.setName(rs.getString("name"));
-                    return genre;
-                },
-                filmId);
-        return new LinkedHashSet<>(genres);
-    }
-
-    private Set<Long> getLikes(long filmId) {
-        List<Long> likes = jdbcTemplate.query(
-                "SELECT user_id FROM film_likes WHERE film_id = ?",
-                (rs, rowNum) -> rs.getLong("user_id"),
-                filmId);
-        return new HashSet<>(likes);
+    private Map<Long, Set<Long>> getLikesByFilmIds(List<Long> filmIds) {
+        String inSql = String.join(",", Collections.nCopies(filmIds.size(), "?"));
+        String sql = "SELECT film_id, user_id FROM film_likes WHERE film_id IN (" + inSql + ")";
+        Map<Long, Set<Long>> likesByFilmId = new HashMap<>();
+        jdbcTemplate.query(sql, rs -> {
+            long filmId = rs.getLong("film_id");
+            likesByFilmId.computeIfAbsent(filmId, id -> new HashSet<>()).add(rs.getLong("user_id"));
+        }, filmIds.toArray());
+        return likesByFilmId;
     }
 }

@@ -18,7 +18,9 @@ import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -115,20 +117,31 @@ public class FilmService {
         if (film.getLikes() == null) {
             film.setLikes(new HashSet<>());
         }
+        if (film.getMpa() == null) {
+            log.warn("Film mpa validation failed");
+            throw new ValidationException("Mpa rating must be specified");
+        }
         Mpa mpa = mpaStorage.findById(film.getMpa().getId())
                 .orElseThrow(() -> {
                     log.warn("Mpa rating not found: {}", film.getMpa().getId());
                     return new NotFoundException("Mpa rating with id " + film.getMpa().getId() + " not found");
                 });
         film.setMpa(mpa);
+        List<Integer> genreIds = film.getGenres().stream()
+                .map(Genre::getId)
+                .toList();
+        if (genreIds.isEmpty()) {
+            return;
+        }
+        Map<Integer, Genre> genresById = genreStorage.findByIds(genreIds).stream()
+                .collect(Collectors.toMap(Genre::getId, genre -> genre));
+        if (genresById.size() < genreIds.size()) {
+            log.warn("One or more genres not found: {}", genreIds);
+            throw new NotFoundException("One or more genres not found");
+        }
         Set<Genre> genres = new LinkedHashSet<>();
-        for (Genre genre : film.getGenres()) {
-            Genre foundGenre = genreStorage.findById(genre.getId())
-                    .orElseThrow(() -> {
-                        log.warn("Genre not found: {}", genre.getId());
-                        return new NotFoundException("Genre with id " + genre.getId() + " not found");
-                    });
-            genres.add(foundGenre);
+        for (Integer genreId : genreIds) {
+            genres.add(genresById.get(genreId));
         }
         film.setGenres(genres);
     }

@@ -6,6 +6,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
+import ru.yandex.practicum.filmorate.model.Genre;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,6 +31,19 @@ class GenreDbStorageTest {
                 .hasValueSatisfying(genre ->
                         assertThat(genre.getName()).isEqualTo("Комедия")
                 );
+    }
+
+    @Test
+    void testFindByIds() {
+        assertThat(genreStorage.findByIds(List.of(1, 2, 3)))
+                .hasSize(3)
+                .extracting(Genre::getId)
+                .containsExactly(1, 2, 3);
+    }
+
+    @Test
+    void testFindByIdsReturnsPartialResultForMissingIds() {
+        assertThat(genreStorage.findByIds(List.of(1, 999))).hasSize(1);
     }
 
     @Test

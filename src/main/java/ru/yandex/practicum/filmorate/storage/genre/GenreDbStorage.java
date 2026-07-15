@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import ru.yandex.practicum.filmorate.model.Genre;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,5 +36,16 @@ public class GenreDbStorage implements GenreStorage {
                 "SELECT genre_id, name FROM genres WHERE genre_id = ?",
                 genreRowMapper, id);
         return genres.stream().findFirst();
+    }
+
+    @Override
+    public List<Genre> findByIds(Collection<Integer> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        String inSql = String.join(",", Collections.nCopies(ids.size(), "?"));
+        return jdbcTemplate.query(
+                "SELECT genre_id, name FROM genres WHERE genre_id IN (" + inSql + ")",
+                genreRowMapper, ids.toArray());
     }
 }

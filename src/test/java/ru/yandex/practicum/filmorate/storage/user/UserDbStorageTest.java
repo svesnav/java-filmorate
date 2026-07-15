@@ -83,15 +83,44 @@ class UserDbStorageTest {
 
         userStorage.addFriend(user1.getId(), user2.getId());
 
-        assertThat(userStorage.findById(user1.getId()).orElseThrow().getFriends())
+        assertThat(userStorage.getFriends(user1.getId()))
+                .extracting(User::getId)
                 .contains(user2.getId());
-        assertThat(userStorage.findById(user2.getId()).orElseThrow().getFriends())
-                .doesNotContain(user1.getId());
+        assertThat(userStorage.getFriends(user2.getId()))
+                .isEmpty();
 
         userStorage.removeFriend(user1.getId(), user2.getId());
 
-        assertThat(userStorage.findById(user1.getId()).orElseThrow().getFriends())
-                .doesNotContain(user2.getId());
+        assertThat(userStorage.getFriends(user1.getId()))
+                .isEmpty();
+    }
+
+    @Test
+    void testGetCommonFriends() {
+        User user1 = new User();
+        user1.setEmail("common1@mail.ru");
+        user1.setLogin("common1");
+        user1.setName("Common 1");
+        user1.setBirthday(LocalDate.of(1990, 1, 1));
+        User user2 = new User();
+        user2.setEmail("common2@mail.ru");
+        user2.setLogin("common2");
+        user2.setName("Common 2");
+        user2.setBirthday(LocalDate.of(1991, 1, 1));
+        User user3 = new User();
+        user3.setEmail("common3@mail.ru");
+        user3.setLogin("common3");
+        user3.setName("Common 3");
+        user3.setBirthday(LocalDate.of(1992, 1, 1));
+        userStorage.add(user1);
+        userStorage.add(user2);
+        userStorage.add(user3);
+        userStorage.addFriend(user1.getId(), user3.getId());
+        userStorage.addFriend(user2.getId(), user3.getId());
+
+        assertThat(userStorage.getCommonFriends(user1.getId(), user2.getId()))
+                .extracting(User::getId)
+                .containsExactly(user3.getId());
     }
 
     @Test

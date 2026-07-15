@@ -83,17 +83,15 @@ public class UserDbStorage implements UserStorage {
             return Optional.empty();
         }
         User user = users.getFirst();
-        user.setFriends(getFriends(id));
+        user.setFriends(loadFriendIds(id));
         return Optional.of(user);
     }
 
     @Override
     public Collection<User> findAll() {
-        List<User> users = jdbcTemplate.query(
+        return jdbcTemplate.query(
                 "SELECT user_id, email, login, name, birthday FROM users ORDER BY user_id",
                 userRowMapper);
-        users.forEach(user -> user.setFriends(getFriends(user.getId())));
-        return users;
     }
 
     @Override
@@ -108,7 +106,29 @@ public class UserDbStorage implements UserStorage {
         log.debug("Friendship removed: userId={}, friendId={}", userId, friendId);
     }
 
-    private Set<Long> getFriends(long userId) {
+    @Override
+    public List<User> getFriends(long userId) {
+        return jdbcTemplate.query(
+                "SELECT u.user_id, u.email, u.login, u.name, u.birthday "
+                        + "FROM users u "
+                        + "JOIN friendships f ON u.user_id = f.friend_id "
+                        + "WHERE f.user_id = ? "
+                        + "ORDER BY u.user_id",
+                userRowMapper, userId);
+    }
+
+    @Override
+    public List<User> getCommonFriends(long userId, long otherId) {
+        return jdbcTemplate.query(
+                "SELECT u.user_id, u.email, u.login, u.name, u.birthday "
+                        + "FROM users u "
+                        + "JOIN friendships f1 ON u.user_id = f1.friend_id AND f1.user_id = ? "
+                        + "JOIN friendships f2 ON u.user_id = f2.friend_id AND f2.user_id = ? "
+                        + "ORDER BY u.user_id",
+                userRowMapper, userId, otherId);
+    }
+
+    private Set<Long> loadFriendIds(long userId) {
         List<Long> friendIds = jdbcTemplate.query(
                 "SELECT friend_id FROM friendships WHERE user_id = ?",
                 (rs, rowNum) -> rs.getLong("friend_id"),
