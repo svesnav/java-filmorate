@@ -148,6 +148,34 @@ public class FilmDbStorage implements FilmStorage {
         log.debug("Like removed: filmId={}, userId={}", filmId, userId);
     }
 
+    @Override
+    public Optional<Long> findMostSimilarUserId(long userId) {
+        String sql = "SELECT fl2.user_id " +
+                "FROM film_likes fl1 " +
+                "JOIN film_likes fl2 ON fl1.film_id = fl2.film_id " +
+                "WHERE fl1.user_id = ? AND fl2.user_id != ? " +
+                "GROUP BY fl2.user_id " +
+                "ORDER BY COUNT(fl2.film_id) DESC, fl2.user_id ASC " +
+                "LIMIT 1";
+        List<Long> ids = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getLong("user_id"), userId, userId);
+        return ids.stream().findFirst();
+    }
+
+    @Override
+    public List<Film> getRecommendedFilms(long userId, long similarUserId) {
+        String sql = "SELECT f.film_id, f.name, f.description, f.release_date, f.duration, " +
+                "f.mpa_id, m.name AS mpa_name " +
+                "FROM film_likes fl " +
+                "JOIN films f ON fl.film_id = f.film_id " +
+                "JOIN mpa m ON f.mpa_id = m.mpa_id " +
+                "WHERE fl.user_id = ? " +
+                "AND f.film_id NOT IN (SELECT film_id FROM film_likes WHERE user_id = ?) " +
+                "ORDER BY f.film_id";
+        List<Film> films = jdbcTemplate.query(sql, filmRowMapper, similarUserId, userId);
+        enrichFilms(films);
+        return films;
+    }
+
     private void saveGenres(Film film) {
         if (film.getGenres() == null || film.getGenres().isEmpty()) {
             return;

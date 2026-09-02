@@ -6,21 +6,27 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
 public class UserService {
     private final UserStorage userStorage;
+    private final FilmStorage filmStorage;
 
     @Autowired
-    public UserService(@Qualifier("userDbStorage") UserStorage userStorage) {
+    public UserService(@Qualifier("userDbStorage") UserStorage userStorage,
+                       @Qualifier("filmDbStorage") FilmStorage filmStorage) {
         this.userStorage = userStorage;
+        this.filmStorage = filmStorage;
     }
 
     public List<User> findAll() {
@@ -83,6 +89,18 @@ public class UserService {
         getUserOrThrow(otherId);
         log.info("Showed common friends of users {} and {}", userId, otherId);
         return userStorage.getCommonFriends(userId, otherId);
+    }
+
+    public List<Film> getRecommendations(long userId) {
+        getUserOrThrow(userId);
+        Optional<Long> similarUserIdOpt = filmStorage.findMostSimilarUserId(userId);
+        if (similarUserIdOpt.isEmpty()) {
+            log.info("No similar user found for user {}", userId);
+            return List.of();
+        }
+        long similarUserId = similarUserIdOpt.get();
+        log.info("Found similar user {} for user {}", similarUserId, userId);
+        return filmStorage.getRecommendedFilms(userId, similarUserId);
     }
 
     private void validateDifferentUsers(long userId, long otherUserId) {
