@@ -26,4 +26,6 @@ public interface FilmStorage {
     Optional<Long> findMostSimilarUserId(long userId);
 
     List<Film> getRecommendedFilms(long userId, long similarUserId);
+
+    List<Film> getFilmsByDirectorSorted(long directorId, String sortBy);
 }
