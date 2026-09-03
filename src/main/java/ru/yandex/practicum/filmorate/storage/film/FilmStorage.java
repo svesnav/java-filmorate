@@ -5,6 +5,7 @@ import ru.yandex.practicum.filmorate.model.Film;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface FilmStorage {
     Film add(Film film);
@@ -18,6 +19,8 @@ public interface FilmStorage {
     Collection<Film> findAll();
 
     List<Film> getPopular(Integer count);
+
+    List<Film> search(String query, Set<String> by);
 
     void addLike(long filmId, long userId);
 
