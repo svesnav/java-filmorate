@@ -169,4 +169,11 @@ public class FilmService {
             throw new ValidationException("Mpa rating must be specified");
         }
     }
+
+    public List<Film> getFilmsByDirectorSorted(long directorId, String sortBy) {
+        if (!sortBy.equals("year") && !sortBy.equals("likes")) {
+            throw new ValidationException("Invalid sortBy value: " + sortBy);
+        }
+        return filmStorage.getFilmsByDirectorSorted(directorId, sortBy);
+    }
 }

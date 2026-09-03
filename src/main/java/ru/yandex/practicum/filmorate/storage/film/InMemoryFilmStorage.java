@@ -123,4 +123,19 @@ public class InMemoryFilmStorage implements FilmStorage {
                 .sorted(Comparator.comparingLong(Film::getId))
                 .toList();
     }
+
+    @Override
+    public List<Film> getFilmsByDirectorSorted(long directorId, String sortBy) {
+        return films.values().stream()
+                .filter(f -> f.getDirectors() != null &&
+                        f.getDirectors().stream().anyMatch(d -> d.getId() == directorId))
+                .sorted((f1, f2) -> {
+                    if ("year".equals(sortBy)) {
+                        return f1.getReleaseDate().compareTo(f2.getReleaseDate());
+                    } else {
+                        return Integer.compare(f2.getLikes().size(), f1.getLikes().size());
+                    }
+                })
+                .toList();
+    }
 }
