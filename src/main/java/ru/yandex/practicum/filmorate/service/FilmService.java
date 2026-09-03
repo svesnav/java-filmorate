@@ -18,6 +18,7 @@ import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class FilmService {
+    private static final Set<String> SEARCH_FIELDS = Set.of("title", "director");
 
     private final FilmStorage filmStorage;
     private final UserStorage userStorage;
@@ -92,6 +94,23 @@ public class FilmService {
     public List<Film> getPopular(Integer count) {
         log.info("Showed {} popular films", count);
         return filmStorage.getPopular(count);
+    }
+
+    public List<Film> search(String query, Set<String> by) {
+        if (query == null || query.isBlank()) {
+            throw new ValidationException("Search query cannot be empty");
+        }
+        if (by == null || by.isEmpty()) {
+            throw new ValidationException("Search fields cannot be empty");
+        }
+        Set<String> searchFields = by.stream()
+                .map(field -> field.trim().toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+        if (!SEARCH_FIELDS.containsAll(searchFields)) {
+            throw new ValidationException("Invalid search field: " + by);
+        }
+        log.info("Searched films by {} with query {}", searchFields, query);
+        return filmStorage.search(query, searchFields);
     }
 
     private Film getFilmOrThrow(long id) {

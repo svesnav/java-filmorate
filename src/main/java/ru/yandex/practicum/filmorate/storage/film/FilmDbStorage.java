@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -144,6 +145,34 @@ public class FilmDbStorage implements FilmStorage {
                         + "ORDER BY COUNT(fl.user_id) DESC, f.film_id ASC "
                         + "LIMIT ?",
                 filmRowMapper, limit);
+        enrichFilms(films);
+        return films;
+    }
+
+    @Override
+    public List<Film> search(String query, Set<String> by) {
+        List<String> conditions = new ArrayList<>();
+        List<Object> parameters = new ArrayList<>();
+        String pattern = "%" + query.toLowerCase(Locale.ROOT) + "%";
+        if (by.contains("title")) {
+            conditions.add("LOWER(f.name) LIKE ?");
+            parameters.add(pattern);
+        }
+        if (by.contains("director")) {
+            conditions.add("EXISTS (SELECT 1 FROM film_directors fd " +
+                    "JOIN directors d ON fd.director_id = d.director_id " +
+                    "WHERE fd.film_id = f.film_id AND LOWER(d.name) LIKE ?)");
+            parameters.add(pattern);
+        }
+        String sql = "SELECT f.film_id, f.name, f.description, f.release_date, f.duration, " +
+                "f.mpa_id, m.name AS mpa_name " +
+                "FROM films f " +
+                "JOIN mpa m ON f.mpa_id = m.mpa_id " +
+                "LEFT JOIN film_likes fl ON f.film_id = fl.film_id " +
+                "WHERE " + String.join(" OR ", conditions) + " " +
+                "GROUP BY f.film_id, f.name, f.description, f.release_date, f.duration, f.mpa_id, m.name " +
+                "ORDER BY COUNT(fl.user_id) DESC, f.film_id ASC";
+        List<Film> films = jdbcTemplate.query(sql, filmRowMapper, parameters.toArray());
         enrichFilms(films);
         return films;
     }
