@@ -18,7 +18,7 @@ public interface FilmStorage {
 
     Collection<Film> findAll();
 
-    List<Film> getPopular(Integer count);
+    List<Film> getPopular(Integer count, Integer genreId, Integer year);
 
     List<Film> search(String query, Set<String> by);
 
