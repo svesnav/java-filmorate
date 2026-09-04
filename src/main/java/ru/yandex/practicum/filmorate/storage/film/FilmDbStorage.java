@@ -9,6 +9,8 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
+import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.model.Director;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
@@ -24,6 +26,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -36,6 +39,13 @@ public class FilmDbStorage implements FilmStorage {
     private static final int DEFAULT_POPULAR_COUNT = 10;
 
     private final JdbcTemplate jdbcTemplate;
+
+    private static final String SELECT_FILM_DIRECTORS =
+            "SELECT fd.film_id, d.director_id, d.name FROM film_directors fd " +
+                    "JOIN directors d ON fd.director_id = d.director_id WHERE fd.film_id IN (%s)";
+
+    private static final String INSERT_FILM_DIRECTOR =
+            "INSERT INTO film_directors (film_id, director_id) VALUES (?, ?)";
 
     private final RowMapper<Film> filmRowMapper = (rs, rowNum) -> {
         Film film = new Film();
@@ -69,6 +79,7 @@ public class FilmDbStorage implements FilmStorage {
         }, keyHolder);
         film.setId(keyHolder.getKey().longValue());
         saveGenres(film);
+        saveDirectors(film);
         film.setLikes(new HashSet<>());
         log.debug("Film added to database: {}", film);
         return findById(film.getId()).orElse(film);
@@ -82,6 +93,8 @@ public class FilmDbStorage implements FilmStorage {
                 film.getDuration(), film.getMpa().getId(), film.getId());
         jdbcTemplate.update("DELETE FROM film_genres WHERE film_id = ?", film.getId());
         saveGenres(film);
+        jdbcTemplate.update("DELETE FROM film_directors WHERE film_id = ?", film.getId());
+        saveDirectors(film);
         log.debug("Film updated in database: {}", film);
         return findById(film.getId()).orElse(film);
     }
@@ -132,6 +145,34 @@ public class FilmDbStorage implements FilmStorage {
                         + "ORDER BY COUNT(fl.user_id) DESC, f.film_id ASC "
                         + "LIMIT ?",
                 filmRowMapper, limit);
+        enrichFilms(films);
+        return films;
+    }
+
+    @Override
+    public List<Film> search(String query, Set<String> by) {
+        List<String> conditions = new ArrayList<>();
+        List<Object> parameters = new ArrayList<>();
+        String pattern = "%" + query.toLowerCase(Locale.ROOT) + "%";
+        if (by.contains("title")) {
+            conditions.add("LOWER(f.name) LIKE ?");
+            parameters.add(pattern);
+        }
+        if (by.contains("director")) {
+            conditions.add("EXISTS (SELECT 1 FROM film_directors fd " +
+                    "JOIN directors d ON fd.director_id = d.director_id " +
+                    "WHERE fd.film_id = f.film_id AND LOWER(d.name) LIKE ?)");
+            parameters.add(pattern);
+        }
+        String sql = "SELECT f.film_id, f.name, f.description, f.release_date, f.duration, " +
+                "f.mpa_id, m.name AS mpa_name " +
+                "FROM films f " +
+                "JOIN mpa m ON f.mpa_id = m.mpa_id " +
+                "LEFT JOIN film_likes fl ON f.film_id = fl.film_id " +
+                "WHERE " + String.join(" OR ", conditions) + " " +
+                "GROUP BY f.film_id, f.name, f.description, f.release_date, f.duration, f.mpa_id, m.name " +
+                "ORDER BY COUNT(fl.user_id) DESC, f.film_id ASC";
+        List<Film> films = jdbcTemplate.query(sql, filmRowMapper, parameters.toArray());
         enrichFilms(films);
         return films;
     }
@@ -197,6 +238,25 @@ public class FilmDbStorage implements FilmStorage {
                 });
     }
 
+    private void saveDirectors(Film film) {
+        if (film.getDirectors() == null || film.getDirectors().isEmpty()) {
+            return;
+        }
+        List<Director> directors = new ArrayList<>(film.getDirectors());
+        jdbcTemplate.batchUpdate(INSERT_FILM_DIRECTOR, new BatchPreparedStatementSetter() {
+            @Override
+            public void setValues(PreparedStatement ps, int i) throws SQLException {
+                ps.setLong(1, film.getId());
+                ps.setLong(2, directors.get(i).getId());
+            }
+
+            @Override
+            public int getBatchSize() {
+                return directors.size();
+            }
+        });
+    }
+
     private void enrichFilms(List<Film> films) {
         if (films.isEmpty()) {
             return;
@@ -204,9 +264,11 @@ public class FilmDbStorage implements FilmStorage {
         List<Long> filmIds = films.stream().map(Film::getId).toList();
         Map<Long, Set<Genre>> genresByFilmId = getGenresByFilmIds(filmIds);
         Map<Long, Set<Long>> likesByFilmId = getLikesByFilmIds(filmIds);
+        Map<Long, Set<Director>> directorsByFilmId = getDirectorsByFilmIds(filmIds);
         films.forEach(film -> {
             film.setGenres(genresByFilmId.getOrDefault(film.getId(), new LinkedHashSet<>()));
             film.setLikes(likesByFilmId.getOrDefault(film.getId(), new HashSet<>()));
+            film.setDirectors(directorsByFilmId.getOrDefault(film.getId(), new LinkedHashSet<>()));
         });
     }
 
@@ -237,5 +299,44 @@ public class FilmDbStorage implements FilmStorage {
             likesByFilmId.computeIfAbsent(filmId, id -> new HashSet<>()).add(rs.getLong("user_id"));
         }, filmIds.toArray());
         return likesByFilmId;
+    }
+
+    private Map<Long, Set<Director>> getDirectorsByFilmIds(List<Long> filmIds) {
+        if (filmIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        String inSql = String.join(",", Collections.nCopies(filmIds.size(), "?"));
+        String sql = String.format(SELECT_FILM_DIRECTORS, inSql);
+        Map<Long, Set<Director>> directorsByFilmId = new HashMap<>();
+        jdbcTemplate.query(sql, rs -> {
+            long filmId = rs.getLong("film_id");
+            Director director = new Director();
+            director.setId(rs.getLong("director_id"));
+            director.setName(rs.getString("name"));
+            directorsByFilmId.computeIfAbsent(filmId, id -> new LinkedHashSet<>()).add(director);
+        }, filmIds.toArray());
+        return directorsByFilmId;
+    }
+
+    @Override
+    public List<Film> getFilmsByDirectorSorted(long directorId, String sortBy) {
+        String orderBy = switch (sortBy) {
+            case "year" -> "ORDER BY f.release_date ASC";
+            case "likes" -> "ORDER BY like_count DESC";
+            default -> throw new ValidationException("Invalid sortBy value: " + sortBy);
+        };
+        String sql = "SELECT f.film_id, f.name, f.description, f.release_date, f.duration, " +
+                "f.mpa_id, m.name AS mpa_name, COUNT(fl.user_id) AS like_count " +
+                "FROM films f " +
+                "JOIN film_directors fd ON f.film_id = fd.film_id " +
+                "JOIN directors d ON fd.director_id = d.director_id " +
+                "LEFT JOIN mpa m ON f.mpa_id = m.mpa_id " +
+                "LEFT JOIN film_likes fl ON f.film_id = fl.film_id " +
+                "WHERE d.director_id = ? " +
+                "GROUP BY f.film_id, f.name, f.description, f.release_date, f.duration, f.mpa_id, m.name " +
+                orderBy;
+        List<Film> films = jdbcTemplate.query(sql, filmRowMapper, directorId);
+        enrichFilms(films);
+        return films;
     }
 }

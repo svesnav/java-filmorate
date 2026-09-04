@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -59,6 +60,20 @@ public class InMemoryFilmStorage implements FilmStorage {
                 .sorted(Comparator.comparingInt((Film film) -> film.getLikes().size()).reversed()
                         .thenComparingLong(Film::getId))
                 .limit(limit)
+                .toList();
+    }
+
+    @Override
+    public List<Film> search(String query, Set<String> by) {
+        String normalizedQuery = query.toLowerCase(Locale.ROOT);
+        return films.values().stream()
+                .filter(film -> (by.contains("title") &&
+                        film.getName().toLowerCase(Locale.ROOT).contains(normalizedQuery) ||
+                        by.contains("director") && film.getDirectors() != null && film.getDirectors().stream()
+                                .anyMatch(director -> director.getName().toLowerCase(Locale.ROOT)
+                                        .contains(normalizedQuery))))
+                .sorted(Comparator.comparingInt((Film film) -> film.getLikes().size()).reversed()
+                        .thenComparingLong(Film::getId))
                 .toList();
     }
 
@@ -121,6 +136,21 @@ public class InMemoryFilmStorage implements FilmStorage {
         return films.values().stream()
                 .filter(f -> f.getLikes().contains(similarUserId) && !userLikes.contains(f.getId()))
                 .sorted(Comparator.comparingLong(Film::getId))
+                .toList();
+    }
+
+    @Override
+    public List<Film> getFilmsByDirectorSorted(long directorId, String sortBy) {
+        return films.values().stream()
+                .filter(f -> f.getDirectors() != null &&
+                        f.getDirectors().stream().anyMatch(d -> d.getId() == directorId))
+                .sorted((f1, f2) -> {
+                    if ("year".equals(sortBy)) {
+                        return f1.getReleaseDate().compareTo(f2.getReleaseDate());
+                    } else {
+                        return Integer.compare(f2.getLikes().size(), f1.getLikes().size());
+                    }
+                })
                 .toList();
     }
 }
