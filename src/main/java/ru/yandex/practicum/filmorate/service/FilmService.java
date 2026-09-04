@@ -6,9 +6,13 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.model.EventType;
+import ru.yandex.practicum.filmorate.model.FeedEvent;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
+import ru.yandex.practicum.filmorate.model.Operation;
+import ru.yandex.practicum.filmorate.storage.feed.FeedStorage;
 import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
 import ru.yandex.practicum.filmorate.storage.genre.GenreStorage;
 import ru.yandex.practicum.filmorate.storage.mpa.MpaStorage;
@@ -32,16 +36,19 @@ public class FilmService {
     private final UserStorage userStorage;
     private final MpaStorage mpaStorage;
     private final GenreStorage genreStorage;
+    private final FeedStorage feedStorage;
 
     @Autowired
     public FilmService(@Qualifier("filmDbStorage") FilmStorage filmStorage,
                        @Qualifier("userDbStorage") UserStorage userStorage,
                        @Qualifier("mpaDbStorage") MpaStorage mpaStorage,
-                       @Qualifier("genreDbStorage") GenreStorage genreStorage) {
+                       @Qualifier("genreDbStorage") GenreStorage genreStorage,
+                       @Qualifier("feedDbStorage") FeedStorage feedStorage) {
         this.filmStorage = filmStorage;
         this.userStorage = userStorage;
         this.mpaStorage = mpaStorage;
         this.genreStorage = genreStorage;
+        this.feedStorage = feedStorage;
     }
 
     public List<Film> findAll() {
@@ -81,6 +88,7 @@ public class FilmService {
         getUserOrThrow(userId);
         getFilmOrThrow(filmId);
         filmStorage.addLike(filmId, userId);
+        addFeedEvent(userId, Operation.ADD, filmId);
         log.info("User {} liked film {}", userId, filmId);
     }
 
@@ -88,6 +96,7 @@ public class FilmService {
         getUserOrThrow(userId);
         getFilmOrThrow(filmId);
         filmStorage.removeLike(filmId, userId);
+        addFeedEvent(userId, Operation.REMOVE, filmId);
         log.info("User {} removed like from film {}", userId, filmId);
     }
 
@@ -119,6 +128,11 @@ public class FilmService {
                     log.warn("Film not found: {}", id);
                     return new NotFoundException("Film with id " + id + " not found");
                 });
+    }
+
+    private void addFeedEvent(long userId, Operation operation, long filmId) {
+        feedStorage.add(new FeedEvent(System.currentTimeMillis(), userId, EventType.LIKE,
+                operation, 0, filmId));
     }
 
     private void getUserOrThrow(long id) {
