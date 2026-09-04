@@ -6,8 +6,12 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.model.EventType;
+import ru.yandex.practicum.filmorate.model.FeedEvent;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Operation;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.storage.feed.FeedStorage;
 import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
@@ -21,12 +25,15 @@ import java.util.Optional;
 public class UserService {
     private final UserStorage userStorage;
     private final FilmStorage filmStorage;
+    private final FeedStorage feedStorage;
 
     @Autowired
     public UserService(@Qualifier("userDbStorage") UserStorage userStorage,
-                       @Qualifier("filmDbStorage") FilmStorage filmStorage) {
+                       @Qualifier("filmDbStorage") FilmStorage filmStorage,
+                       @Qualifier("feedDbStorage") FeedStorage feedStorage) {
         this.userStorage = userStorage;
         this.filmStorage = filmStorage;
+        this.feedStorage = feedStorage;
     }
 
     public List<User> findAll() {
@@ -66,6 +73,7 @@ public class UserService {
         getUserOrThrow(userId);
         getUserOrThrow(friendId);
         userStorage.addFriend(userId, friendId);
+        addFeedEvent(userId, Operation.ADD, friendId);
         log.info("User {} added user {} as friend", userId, friendId);
     }
 
@@ -74,6 +82,7 @@ public class UserService {
         getUserOrThrow(userId);
         getUserOrThrow(friendId);
         userStorage.removeFriend(userId, friendId);
+        addFeedEvent(userId, Operation.REMOVE, friendId);
         log.info("User {} removed user {} from friends", userId, friendId);
     }
 
@@ -108,6 +117,11 @@ public class UserService {
             log.warn("Users must be different: userId={}", userId);
             throw new ValidationException("Users must be different");
         }
+    }
+
+    private void addFeedEvent(long userId, Operation operation, long friendId) {
+        feedStorage.add(new FeedEvent(System.currentTimeMillis(), userId, EventType.FRIEND,
+                operation, 0, friendId));
     }
 
     private User getUserOrThrow(long id) {

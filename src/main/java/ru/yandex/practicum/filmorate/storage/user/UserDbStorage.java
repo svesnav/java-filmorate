@@ -70,6 +70,7 @@ public class UserDbStorage implements UserStorage {
     public void delete(long id) {
         jdbcTemplate.update("DELETE FROM friendships WHERE user_id = ? OR friend_id = ?", id, id);
         jdbcTemplate.update("DELETE FROM film_likes WHERE user_id = ?", id);
+        jdbcTemplate.update("DELETE FROM feed_events WHERE user_id = ?", id);
         jdbcTemplate.update("DELETE FROM users WHERE user_id = ?", id);
         log.debug("User deleted from database: id={}", id);
     }
