@@ -120,7 +120,7 @@ class FilmDbStorageTest {
         filmStorage.addLike(film2.getId(), userId1);
         filmStorage.addLike(film2.getId(), userId2);
 
-        assertThat(filmStorage.getPopular(10))
+        assertThat(filmStorage.getPopular(10, null, null))
                 .first()
                 .extracting(Film::getId)
                 .isEqualTo(film2.getId());
