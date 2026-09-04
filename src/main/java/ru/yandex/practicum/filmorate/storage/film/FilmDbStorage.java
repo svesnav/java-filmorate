@@ -19,6 +19,7 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -133,18 +134,38 @@ public class FilmDbStorage implements FilmStorage {
     }
 
     @Override
-    public List<Film> getPopular(Integer count) {
+    public List<Film> getPopular(Integer count, Integer genreId, Integer year) {
         int limit = count == null ? DEFAULT_POPULAR_COUNT : count;
-        List<Film> films = jdbcTemplate.query(
-                "SELECT f.film_id, f.name, f.description, f.release_date, f.duration, "
-                        + "f.mpa_id, m.name AS mpa_name "
-                        + "FROM films f "
-                        + "JOIN mpa m ON f.mpa_id = m.mpa_id "
-                        + "LEFT JOIN film_likes fl ON f.film_id = fl.film_id "
-                        + "GROUP BY f.film_id, f.name, f.description, f.release_date, f.duration, f.mpa_id, m.name "
-                        + "ORDER BY COUNT(fl.user_id) DESC, f.film_id ASC "
-                        + "LIMIT ?",
-                filmRowMapper, limit);
+        StringBuilder sql = new StringBuilder(
+                "SELECT f.film_id, f.name, f.description, f.release_date, f.duration, " +
+                        "f.mpa_id, m.name AS mpa_name " +
+                        "FROM films f " +
+                        "JOIN mpa m ON f.mpa_id = m.mpa_id " +
+                        "LEFT JOIN film_likes fl ON f.film_id = fl.film_id ");
+
+        List<Object> params = new ArrayList<>();
+        List<String> conditions = new ArrayList<>();
+
+        if (genreId != null) {
+            conditions.add("EXISTS (SELECT 1 FROM film_genres fg WHERE fg.film_id = f.film_id AND fg.genre_id = ?)");
+            params.add(genreId);
+        }
+        if (year != null) {
+            conditions.add("f.release_date >= ? AND f.release_date < ?");
+            params.add(LocalDate.of(year, 1, 1));
+            params.add(LocalDate.of(year + 1, 1, 1));
+        }
+
+        if (!conditions.isEmpty()) {
+            sql.append(" WHERE ").append(String.join(" AND ", conditions));
+        }
+
+        sql.append(" GROUP BY f.film_id, f.name, f.description, f.release_date, f.duration, f.mpa_id, m.name ");
+        sql.append(" ORDER BY COUNT(fl.user_id) DESC, f.film_id ASC ");
+        sql.append(" LIMIT ?");
+        params.add(limit);
+
+        List<Film> films = jdbcTemplate.query(sql.toString(), filmRowMapper, params.toArray());
         enrichFilms(films);
         return films;
     }

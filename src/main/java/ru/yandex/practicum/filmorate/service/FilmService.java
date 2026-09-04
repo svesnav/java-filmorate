@@ -100,9 +100,9 @@ public class FilmService {
         log.info("User {} removed like from film {}", userId, filmId);
     }
 
-    public List<Film> getPopular(Integer count) {
-        log.info("Showed {} popular films", count);
-        return filmStorage.getPopular(count);
+    public List<Film> getPopular(Integer count, Integer genreId, Integer year) {
+        log.info("Showed {} popular films with genreId={} and year={}", count, genreId, year);
+        return filmStorage.getPopular(count, genreId, year);
     }
 
     public List<Film> search(String query, Set<String> by) {
