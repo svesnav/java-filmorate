@@ -20,17 +20,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 @Slf4j
 @Repository
@@ -360,4 +350,27 @@ public class FilmDbStorage implements FilmStorage {
         enrichFilms(films);
         return films;
     }
+
+    @Override
+    public Collection<Film> getCommonFilms(long userId, long friendId) {
+        String sql = "SELECT f.film_id, f.name, f.description, f.release_date, f.duration, f.mpa_id, " +
+                "m.name AS mpa_name " +
+                "FROM films f " +
+                "JOIN mpa m ON f.mpa_id = m.mpa_id " +
+                "JOIN film_likes fl1 ON f.film_id = fl1.film_id AND fl1.user_id = ? " +
+                "JOIN film_likes fl2 ON f.film_id = fl2.film_id AND fl2.user_id = ? " +
+                "LEFT JOIN film_likes fl3 ON f.film_id = fl3.film_id " +
+                "GROUP BY f.film_id, f.name, f.description, f.release_date, f.duration, f.mpa_id, m.name " +
+                "ORDER BY COUNT(fl3.user_id) DESC, f.film_id ASC";
+
+        List<Film> commonFilms = jdbcTemplate.query(sql, filmRowMapper, userId, friendId);
+
+        if (!commonFilms.isEmpty()) {
+            enrichFilms(commonFilms);
+        }
+
+        return commonFilms;
+    }
+
+
 }
