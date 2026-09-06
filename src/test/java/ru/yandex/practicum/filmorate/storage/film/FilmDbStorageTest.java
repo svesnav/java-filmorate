@@ -29,6 +29,15 @@ class FilmDbStorageTest {
     private final UserDbStorage userStorage;
     private final DirectorDbStorage directorStorage;
 
+    private User createValidUser() {
+        User user = new User();
+        user.setEmail("film-user@mail.ru");
+        user.setLogin("film-user");
+        user.setName("Film User");
+        user.setBirthday(LocalDate.of(1990, 1, 1));
+        return user;
+    }
+
     private Film createValidFilm() {
         Film film = new Film();
         film.setName("Test Film");
@@ -88,7 +97,7 @@ class FilmDbStorageTest {
     @Test
     void testAddAndRemoveLike() {
         Film film = filmStorage.add(createValidFilm());
-        long userId = userStorage.findById(1).orElseThrow().getId();
+        long userId = userStorage.add(createValidUser()).getId();
 
         filmStorage.addLike(film.getId(), userId);
 
@@ -109,7 +118,7 @@ class FilmDbStorageTest {
         film2.setName("Film 2");
         film1 = filmStorage.add(film1);
         film2 = filmStorage.add(film2);
-        long userId1 = userStorage.findById(1).orElseThrow().getId();
+        long userId1 = userStorage.add(createValidUser()).getId();
         ru.yandex.practicum.filmorate.model.User user2 = new ru.yandex.practicum.filmorate.model.User();
         user2.setEmail("popular@mail.ru");
         user2.setLogin("popular");
@@ -148,7 +157,7 @@ class FilmDbStorageTest {
         third.setDirectors(Set.of(matchingDirector));
         third = filmStorage.add(third);
 
-        long firstUserId = userStorage.findById(1).orElseThrow().getId();
+        long firstUserId = userStorage.add(createValidUser()).getId();
         User secondUser = new User();
         secondUser.setEmail("search@mail.ru");
         secondUser.setLogin("search");
