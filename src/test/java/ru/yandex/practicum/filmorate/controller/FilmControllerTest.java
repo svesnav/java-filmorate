@@ -2,14 +2,18 @@ package ru.yandex.practicum.filmorate.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.filmorate.model.Director;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Mpa;
+import ru.yandex.practicum.filmorate.storage.director.DirectorDbStorage;
 
 import java.time.LocalDate;
 import java.util.Set;
@@ -27,6 +31,9 @@ class FilmControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private DirectorDbStorage directorStorage;
+
     private Film validFilm() {
         Film film = new Film();
         film.setName("Test Film");
@@ -37,6 +44,22 @@ class FilmControllerTest {
         mpa.setId(1);
         film.setMpa(mpa);
         return film;
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"year", "likes"})
+    void shouldReturnNotFoundForDeletedDirector(String sortBy) throws Exception {
+        Director director = new Director();
+        director.setName("Deleted director");
+        long directorId = directorStorage.add(director).getId();
+
+        mockMvc.perform(get("/films/director/{id}", directorId).param("sortBy", sortBy))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+        mockMvc.perform(delete("/directors/{id}", directorId))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/films/director/{id}", directorId).param("sortBy", sortBy))
+                .andExpect(status().isNotFound());
     }
 
     @Test

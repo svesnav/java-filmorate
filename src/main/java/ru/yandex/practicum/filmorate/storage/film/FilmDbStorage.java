@@ -193,7 +193,8 @@ public class FilmDbStorage implements FilmStorage {
 
     @Override
     public void addLike(long filmId, long userId) {
-        jdbcTemplate.update("INSERT INTO film_likes (film_id, user_id) VALUES (?, ?)", filmId, userId);
+        jdbcTemplate.update("MERGE INTO film_likes (film_id, user_id) KEY(film_id, user_id) VALUES (?, ?)",
+                filmId, userId);
         log.debug("Like added: filmId={}, userId={}", filmId, userId);
     }
 

@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
+import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.EventType;
 import ru.yandex.practicum.filmorate.model.FeedEvent;
 import ru.yandex.practicum.filmorate.model.Operation;
@@ -36,14 +37,27 @@ public class ReviewService {
     }
 
     public Review create(Review review) {
-        userStorage.findById(review.getUserId()).orElseThrow(() -> new NotFoundException("User not found"));
-        filmStorage.findById(review.getFilmId()).orElseThrow(() -> new NotFoundException("Film not found"));
+        validate(review);
+        if (review.getUserId() == null) {
+            throw new ValidationException("User id must be specified");
+        }
+        if (review.getFilmId() == null) {
+            throw new ValidationException("Film id must be specified");
+        }
+        userStorage.findById(review.getUserId())
+                .orElseThrow(() -> new NotFoundException("User with id " + review.getUserId() + " not found"));
+        filmStorage.findById(review.getFilmId())
+                .orElseThrow(() -> new NotFoundException("Film with id " + review.getFilmId() + " not found"));
         Review created = reviewStorage.create(review);
         addFeedEvent(created.getUserId(), Operation.ADD, created.getReviewId());
         return created;
     }
 
     public Review update(Review review) {
+        validate(review);
+        if (review.getReviewId() == null) {
+            throw new ValidationException("Review id must be specified");
+        }
         Review oldReview = findById(review.getReviewId());
         oldReview.setContent(review.getContent());
         oldReview.setIsPositive(review.getIsPositive());
@@ -82,6 +96,18 @@ public class ReviewService {
 
     public void deleteDislike(Long id, Long userId) {
         reviewStorage.deleteLikeOrDislike(id, userId, false);
+    }
+
+    private void validate(Review review) {
+        if (review.getContent() == null || review.getContent().isBlank()) {
+            throw new ValidationException("Review content cannot be empty");
+        }
+        if (review.getContent().length() > 1000) {
+            throw new ValidationException("Review content must be 1000 characters or less");
+        }
+        if (review.getIsPositive() == null) {
+            throw new ValidationException("Review isPositive must be specified");
+        }
     }
 
     private void addFeedEvent(long userId, Operation operation, long reviewId) {

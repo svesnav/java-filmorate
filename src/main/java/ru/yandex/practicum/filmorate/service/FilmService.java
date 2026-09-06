@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.*;
+import ru.yandex.practicum.filmorate.storage.director.DirectorStorage;
 import ru.yandex.practicum.filmorate.storage.feed.FeedStorage;
 import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
 import ru.yandex.practicum.filmorate.storage.genre.GenreStorage;
@@ -27,18 +28,21 @@ public class FilmService {
     private final MpaStorage mpaStorage;
     private final GenreStorage genreStorage;
     private final FeedStorage feedStorage;
+    private final DirectorStorage directorStorage;
 
     @Autowired
     public FilmService(@Qualifier("filmDbStorage") FilmStorage filmStorage,
                        @Qualifier("userDbStorage") UserStorage userStorage,
                        @Qualifier("mpaDbStorage") MpaStorage mpaStorage,
                        @Qualifier("genreDbStorage") GenreStorage genreStorage,
-                       @Qualifier("feedDbStorage") FeedStorage feedStorage) {
+                       @Qualifier("feedDbStorage") FeedStorage feedStorage,
+                       @Qualifier("directorDbStorage") DirectorStorage directorStorage) {
         this.filmStorage = filmStorage;
         this.userStorage = userStorage;
         this.mpaStorage = mpaStorage;
         this.genreStorage = genreStorage;
         this.feedStorage = feedStorage;
+        this.directorStorage = directorStorage;
     }
 
     public List<Film> findAll() {
@@ -197,6 +201,8 @@ public class FilmService {
         if (!sortBy.equals("year") && !sortBy.equals("likes")) {
             throw new ValidationException("Invalid sortBy value: " + sortBy);
         }
+        directorStorage.findById(directorId)
+                .orElseThrow(() -> new NotFoundException("Director with id " + directorId + " not found"));
         return filmStorage.getFilmsByDirectorSorted(directorId, sortBy);
     }
 

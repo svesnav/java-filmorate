@@ -62,6 +62,7 @@ public class ReviewDbStorage implements ReviewStorage {
 
     @Override
     public void delete(Long id) {
+        jdbcTemplate.update("DELETE FROM review_likes WHERE review_id = ?", id);
         String sql = "DELETE FROM reviews WHERE review_id = ?";
         int rows = jdbcTemplate.update(sql, id);
         if (rows == 0) {
