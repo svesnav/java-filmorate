@@ -20,14 +20,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 class UserDbStorageTest {
     private final UserDbStorage userStorage;
 
+    private User createValidUser() {
+        User user = new User();
+        user.setEmail("test@mail.ru");
+        user.setLogin("testlogin");
+        user.setName("Test User");
+        user.setBirthday(LocalDate.of(1990, 1, 1));
+        return user;
+    }
+
     @Test
     void testFindUserById() {
-        Optional<User> userOptional = userStorage.findById(1);
+        User created = userStorage.add(createValidUser());
+        Optional<User> userOptional = userStorage.findById(created.getId());
 
         assertThat(userOptional)
                 .isPresent()
                 .hasValueSatisfying(user ->
-                        assertThat(user).hasFieldOrPropertyWithValue("id", 1L)
+                        assertThat(user).hasFieldOrPropertyWithValue("id", created.getId())
                 );
     }
 
@@ -52,18 +62,22 @@ class UserDbStorageTest {
 
     @Test
     void testUpdateUser() {
-        User user = userStorage.findById(1).orElseThrow();
+        User user = userStorage.add(createValidUser());
         user.setName("Updated Name");
 
         User updated = userStorage.update(user);
 
         assertThat(updated.getName()).isEqualTo("Updated Name");
-        assertThat(userStorage.findById(1).orElseThrow().getName()).isEqualTo("Updated Name");
+        assertThat(userStorage.findById(user.getId()).orElseThrow().getName()).isEqualTo("Updated Name");
     }
 
     @Test
     void testFindAllUsers() {
-        assertThat(userStorage.findAll()).isNotEmpty();
+        User created = userStorage.add(createValidUser());
+
+        assertThat(userStorage.findAll())
+                .extracting(User::getId)
+                .containsExactly(created.getId());
     }
 
     @Test

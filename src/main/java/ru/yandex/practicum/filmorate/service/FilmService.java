@@ -6,40 +6,43 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
-import ru.yandex.practicum.filmorate.model.Film;
-import ru.yandex.practicum.filmorate.model.Genre;
-import ru.yandex.practicum.filmorate.model.Mpa;
+import ru.yandex.practicum.filmorate.model.*;
+import ru.yandex.practicum.filmorate.storage.director.DirectorStorage;
+import ru.yandex.practicum.filmorate.storage.feed.FeedStorage;
 import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
 import ru.yandex.practicum.filmorate.storage.genre.GenreStorage;
 import ru.yandex.practicum.filmorate.storage.mpa.MpaStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.time.LocalDate;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class FilmService {
+    private static final Set<String> SEARCH_FIELDS = Set.of("title", "director");
 
     private final FilmStorage filmStorage;
     private final UserStorage userStorage;
     private final MpaStorage mpaStorage;
     private final GenreStorage genreStorage;
+    private final FeedStorage feedStorage;
+    private final DirectorStorage directorStorage;
 
     @Autowired
     public FilmService(@Qualifier("filmDbStorage") FilmStorage filmStorage,
                        @Qualifier("userDbStorage") UserStorage userStorage,
                        @Qualifier("mpaDbStorage") MpaStorage mpaStorage,
-                       @Qualifier("genreDbStorage") GenreStorage genreStorage) {
+                       @Qualifier("genreDbStorage") GenreStorage genreStorage,
+                       @Qualifier("feedDbStorage") FeedStorage feedStorage,
+                       @Qualifier("directorDbStorage") DirectorStorage directorStorage) {
         this.filmStorage = filmStorage;
         this.userStorage = userStorage;
         this.mpaStorage = mpaStorage;
         this.genreStorage = genreStorage;
+        this.feedStorage = feedStorage;
+        this.directorStorage = directorStorage;
     }
 
     public List<Film> findAll() {
@@ -79,6 +82,7 @@ public class FilmService {
         getUserOrThrow(userId);
         getFilmOrThrow(filmId);
         filmStorage.addLike(filmId, userId);
+        addFeedEvent(userId, Operation.ADD, filmId);
         log.info("User {} liked film {}", userId, filmId);
     }
 
@@ -86,12 +90,30 @@ public class FilmService {
         getUserOrThrow(userId);
         getFilmOrThrow(filmId);
         filmStorage.removeLike(filmId, userId);
+        addFeedEvent(userId, Operation.REMOVE, filmId);
         log.info("User {} removed like from film {}", userId, filmId);
     }
 
-    public List<Film> getPopular(Integer count) {
-        log.info("Showed {} popular films", count);
-        return filmStorage.getPopular(count);
+    public List<Film> getPopular(Integer count, Integer genreId, Integer year) {
+        log.info("Showed {} popular films with genreId={} and year={}", count, genreId, year);
+        return filmStorage.getPopular(count, genreId, year);
+    }
+
+    public List<Film> search(String query, Set<String> by) {
+        if (query == null || query.isBlank()) {
+            throw new ValidationException("Search query cannot be empty");
+        }
+        if (by == null || by.isEmpty()) {
+            throw new ValidationException("Search fields cannot be empty");
+        }
+        Set<String> searchFields = by.stream()
+                .map(field -> field.trim().toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+        if (!SEARCH_FIELDS.containsAll(searchFields)) {
+            throw new ValidationException("Invalid search field: " + by);
+        }
+        log.info("Searched films by {} with query {}", searchFields, query);
+        return filmStorage.search(query, searchFields);
     }
 
     private Film getFilmOrThrow(long id) {
@@ -100,6 +122,11 @@ public class FilmService {
                     log.warn("Film not found: {}", id);
                     return new NotFoundException("Film with id " + id + " not found");
                 });
+    }
+
+    private void addFeedEvent(long userId, Operation operation, long filmId) {
+        feedStorage.add(new FeedEvent(System.currentTimeMillis(), userId, EventType.LIKE,
+                operation, 0, filmId));
     }
 
     private void getUserOrThrow(long id) {
@@ -168,5 +195,20 @@ public class FilmService {
             log.warn("Film mpa validation failed");
             throw new ValidationException("Mpa rating must be specified");
         }
+    }
+
+    public List<Film> getFilmsByDirectorSorted(long directorId, String sortBy) {
+        if (!sortBy.equals("year") && !sortBy.equals("likes")) {
+            throw new ValidationException("Invalid sortBy value: " + sortBy);
+        }
+        directorStorage.findById(directorId)
+                .orElseThrow(() -> new NotFoundException("Director with id " + directorId + " not found"));
+        return filmStorage.getFilmsByDirectorSorted(directorId, sortBy);
+    }
+
+    public Collection<Film> getCommonFilms(long userId, long friendId) {
+        getUserOrThrow(userId);
+        getUserOrThrow(friendId);
+        return filmStorage.getCommonFilms(userId, friendId);
     }
 }
