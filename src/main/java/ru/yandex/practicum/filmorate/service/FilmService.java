@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 @Service
 public class FilmService {
     private static final Set<String> SEARCH_FIELDS = Set.of("title", "director");
+    private static final int DEFAULT_POPULAR_COUNT = 10;
 
     private final FilmStorage filmStorage;
     private final UserStorage userStorage;
@@ -95,8 +96,12 @@ public class FilmService {
     }
 
     public List<Film> getPopular(Integer count, Integer genreId, Integer year) {
-        log.info("Showed {} popular films with genreId={} and year={}", count, genreId, year);
-        return filmStorage.getPopular(count, genreId, year);
+        int limit = count == null ? DEFAULT_POPULAR_COUNT : count;
+        if (limit <= 0) {
+            throw new ValidationException("Count must be positive");
+        }
+        log.info("Showed {} popular films with genreId={} and year={}", limit, genreId, year);
+        return filmStorage.getPopular(limit, genreId, year);
     }
 
     public List<Film> search(String query, Set<String> by) {
@@ -107,7 +112,7 @@ public class FilmService {
             throw new ValidationException("Search fields cannot be empty");
         }
         Set<String> searchFields = by.stream()
-                .map(field -> field.trim().toLowerCase(Locale.ROOT))
+                .map(field -> field.trim().toLowerCase(Locale.ENGLISH))
                 .collect(Collectors.toSet());
         if (!SEARCH_FIELDS.containsAll(searchFields)) {
             throw new ValidationException("Invalid search field: " + by);
@@ -207,6 +212,9 @@ public class FilmService {
     }
 
     public Collection<Film> getCommonFilms(long userId, long friendId) {
+        if (userId == friendId) {
+            throw new ValidationException("User ID and Friend ID mustn't be the same");
+        }
         getUserOrThrow(userId);
         getUserOrThrow(friendId);
         return filmStorage.getCommonFilms(userId, friendId);

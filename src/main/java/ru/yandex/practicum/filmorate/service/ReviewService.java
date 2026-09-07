@@ -79,23 +79,36 @@ public class ReviewService {
 
     public Collection<Review> getReviews(Long filmId, Integer count) {
         int limit = (count != null) ? count : DEFAULT_LIMIT;
+        if (limit <= 0) {
+            throw new ValidationException("Count must be positive");
+        }
         return reviewStorage.findReviews(filmId, limit);
     }
 
     public void addLike(Long id, Long userId) {
+        validateRating(id, userId);
         reviewStorage.addLikeOrDislike(id, userId, true);
     }
 
     public void addDislike(Long id, Long userId) {
+        validateRating(id, userId);
         reviewStorage.addLikeOrDislike(id, userId, false);
     }
 
     public void deleteLike(Long id, Long userId) {
+        validateRating(id, userId);
         reviewStorage.deleteLikeOrDislike(id, userId, true);
     }
 
     public void deleteDislike(Long id, Long userId) {
+        validateRating(id, userId);
         reviewStorage.deleteLikeOrDislike(id, userId, false);
+    }
+
+    private void validateRating(Long reviewId, Long userId) {
+        userStorage.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User with id " + userId + " not found"));
+        findById(reviewId);
     }
 
     private void validate(Review review) {

@@ -27,8 +27,6 @@ import java.util.*;
 @Qualifier("filmDbStorage")
 @RequiredArgsConstructor
 public class FilmDbStorage implements FilmStorage {
-    private static final int DEFAULT_POPULAR_COUNT = 10;
-
     private final JdbcTemplate jdbcTemplate;
 
     private static final String SELECT_FILM_DIRECTORS =
@@ -92,11 +90,6 @@ public class FilmDbStorage implements FilmStorage {
 
     @Override
     public void delete(long id) {
-        jdbcTemplate.update("DELETE FROM review_likes WHERE review_id IN " +
-                "(SELECT review_id FROM reviews WHERE film_id = ?)", id);
-        jdbcTemplate.update("DELETE FROM reviews WHERE film_id = ?", id);
-        jdbcTemplate.update("DELETE FROM film_genres WHERE film_id = ?", id);
-        jdbcTemplate.update("DELETE FROM film_likes WHERE film_id = ?", id);
         jdbcTemplate.update("DELETE FROM films WHERE film_id = ?", id);
         log.debug("Film deleted from database: id={}", id);
     }
@@ -128,7 +121,6 @@ public class FilmDbStorage implements FilmStorage {
 
     @Override
     public List<Film> getPopular(Integer count, Integer genreId, Integer year) {
-        int limit = count == null ? DEFAULT_POPULAR_COUNT : count;
         StringBuilder sql = new StringBuilder(
                 "SELECT f.film_id, f.name, f.description, f.release_date, f.duration, " +
                         "f.mpa_id, m.name AS mpa_name " +
@@ -156,7 +148,7 @@ public class FilmDbStorage implements FilmStorage {
         sql.append(" GROUP BY f.film_id, f.name, f.description, f.release_date, f.duration, f.mpa_id, m.name ");
         sql.append(" ORDER BY COUNT(fl.user_id) DESC, f.film_id ASC ");
         sql.append(" LIMIT ?");
-        params.add(limit);
+        params.add(count);
 
         List<Film> films = jdbcTemplate.query(sql.toString(), filmRowMapper, params.toArray());
         enrichFilms(films);

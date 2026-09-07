@@ -6,10 +6,12 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -202,6 +204,72 @@ class ReviewControllerTest {
 
         assertThat(createReview()).isEqualTo(firstId + 1);
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM feed_events", Integer.class)).isEqualTo(2);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1})
+    void shouldRejectNonPositiveReviewCount(int count) throws Exception {
+        mockMvc.perform(get("/reviews").param("count", String.valueOf(count)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldApplyDefaultAndRequestedReviewCount() throws Exception {
+        for (int i = 0; i < 11; i++) {
+            createReview();
+        }
+
+        mockMvc.perform(get("/reviews"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(10));
+        mockMvc.perform(get("/reviews").param("count", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+        mockMvc.perform(get("/reviews").param("count", "11"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(11));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"PUT, like", "PUT, dislike", "DELETE, like", "DELETE, dislike"})
+    void shouldReturnNotFoundWhenRatingWithNonExistentUser(String method, String rating) throws Exception {
+        long reviewId = createReview();
+        mockMvc.perform(put("/reviews/{id}/like/{userId}", reviewId, userId))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(request(HttpMethod.valueOf(method), "/reviews/{id}/{rating}/{userId}",
+                        reviewId, rating, Long.MAX_VALUE))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/reviews/{id}", reviewId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.useful").value(1));
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM review_likes", Integer.class)).isEqualTo(1);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"PUT, like", "PUT, dislike", "DELETE, like", "DELETE, dislike"})
+    void shouldReturnNotFoundWhenRatingNonExistentReview(String method, String rating) throws Exception {
+        mockMvc.perform(request(HttpMethod.valueOf(method), "/reviews/{id}/{rating}/{userId}",
+                        Long.MAX_VALUE, rating, userId))
+                .andExpect(status().isNotFound());
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM review_likes", Integer.class)).isZero();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"like, 1", "dislike, -1"})
+    void shouldAddAndRemoveReviewRating(String rating, int useful) throws Exception {
+        long reviewId = createReview();
+
+        mockMvc.perform(put("/reviews/{id}/{rating}/{userId}", reviewId, rating, userId))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/reviews/{id}", reviewId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.useful").value(useful));
+        mockMvc.perform(delete("/reviews/{id}/{rating}/{userId}", reviewId, rating, userId))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/reviews/{id}", reviewId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.useful").value(0));
     }
 
     private ObjectNode validReview() {

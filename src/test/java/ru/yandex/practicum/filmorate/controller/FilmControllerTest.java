@@ -61,6 +61,32 @@ class FilmControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1})
+    void shouldRejectNonPositivePopularCount(int count) throws Exception {
+        mockMvc.perform(get("/films/popular").param("count", String.valueOf(count)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldApplyDefaultAndRequestedPopularCount() throws Exception {
+        for (int i = 0; i < 11; i++) {
+            mockMvc.perform(post("/films").contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(validFilm())))
+                    .andExpect(status().isOk());
+        }
+
+        mockMvc.perform(get("/films/popular"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(10));
+        mockMvc.perform(get("/films/popular").param("count", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+        mockMvc.perform(get("/films/popular").param("count", "11"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(11));
+    }
+
     @Test
     void shouldCreateFilm() throws Exception {
         Film film = validFilm();

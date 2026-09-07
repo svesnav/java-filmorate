@@ -11,7 +11,6 @@ import java.util.*;
 public class InMemoryFilmStorage implements FilmStorage {
     private final Map<Long, Film> films = new HashMap<>();
     private int idCounter = 1;
-    private static final int DEFAULT_POPULAR_COUNT = 10;
 
     @Override
     public Film add(Film film) {
@@ -46,14 +45,13 @@ public class InMemoryFilmStorage implements FilmStorage {
 
     @Override
     public List<Film> getPopular(Integer count, Integer genreId, Integer year) {
-        int limit = count == null ? DEFAULT_POPULAR_COUNT : count;
         return films.values().stream()
                 .filter(film -> (genreId == null || film.getGenres().stream()
                         .anyMatch(genre -> genre.getId() == genreId)))
                 .filter(film -> (year == null || film.getReleaseDate().getYear() == year))
                 .sorted(Comparator.comparingInt((Film film) -> film.getLikes().size()).reversed()
                         .thenComparingLong(Film::getId))
-                .limit(limit)
+                .limit(count)
                 .toList();
     }
 
