@@ -11,7 +11,4 @@ MERGE INTO genres (genre_id, name) KEY (genre_id) VALUES (4, 'Триллер');
 MERGE INTO genres (genre_id, name) KEY (genre_id) VALUES (5, 'Документальный');
 MERGE INTO genres (genre_id, name) KEY (genre_id) VALUES (6, 'Боевик');
 
-MERGE INTO users (user_id, email, login, name, birthday) KEY (user_id)
-    VALUES (1, 'mail@mail.ru', 'dolore', 'Nick Name', DATE '1990-01-01');
 
-ALTER TABLE users ALTER COLUMN user_id RESTART WITH 2;
